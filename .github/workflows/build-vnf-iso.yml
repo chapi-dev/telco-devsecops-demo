@@ -70,7 +70,7 @@ jobs:
           subject-path: image.qcow2
 
       - name: GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             image.qcow2
