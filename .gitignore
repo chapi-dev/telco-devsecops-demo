@@ -23,6 +23,8 @@ charts/*/charts/
 *.tfvars
 !terraform.tfvars.example
 crash.log
+tfplan
+*.tfplan
 
 # Go
 *.test
