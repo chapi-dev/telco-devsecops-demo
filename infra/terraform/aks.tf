@@ -23,8 +23,8 @@ resource "azurerm_kubernetes_cluster" "demo" {
   }
 
   network_profile {
-    network_plugin    = "azure"
-    network_policy    = "cilium"
+    network_plugin = "azure"
+    network_policy = "calico"
     load_balancer_sku = "standard"
   }
 

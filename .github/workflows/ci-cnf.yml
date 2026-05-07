@@ -24,11 +24,16 @@ permissions:
 env:
   ACR: acrtelcodemo.azurecr.io
   CHART_DIR: charts/demo-upf
+  IMAGE_REPO: acrtelcodemo.azurecr.io/nf/demo-nf
+  IMAGE_TAG: "1.0.0"
 
 jobs:
   build:
     name: Build · scan · sign · push
     runs-on: ubuntu-latest
+    outputs:
+      publish: ${{ steps.gate.outputs.ready }}
+      image_digest: ${{ steps.image.outputs.digest }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,8 +111,19 @@ jobs:
             Set AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID after running infra/terraform."
           fi
 
+      - name: Should publish?
+        id: should
+        run: |
+          if [ "${{ steps.gate.outputs.ready }}" = "true" ] && \
+             { [ "${{ github.event_name }}" = "workflow_dispatch" ] || \
+               { [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; }; }; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Azure login (OIDC)
-        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.should.outputs.go == 'true'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -115,24 +131,55 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: ACR login
-        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.should.outputs.go == 'true'
         run: az acr login -n acrtelcodemo
 
+      - name: Build & push container image (demo-nf)
+        id: image
+        if: steps.should.outputs.go == 'true'
+        run: |
+          docker build -t $IMAGE_REPO:$IMAGE_TAG src/demo-nf/
+          docker push $IMAGE_REPO:$IMAGE_TAG
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' $IMAGE_REPO:$IMAGE_TAG | cut -d@ -f2)
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+          echo "Pushed $IMAGE_REPO@$DIGEST"
+
+      - name: Cosign sign container image (keyless)
+        if: steps.should.outputs.go == 'true'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign --yes "$IMAGE_REPO@${{ steps.image.outputs.digest }}"
+
+      - name: Generate container SBOM
+        if: steps.should.outputs.go == 'true'
+        run: |
+          syft "$IMAGE_REPO:$IMAGE_TAG" -o spdx-json > image-sbom.spdx.json
+
+      - name: Cosign attest container SBOM
+        if: steps.should.outputs.go == 'true'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign attest --yes --type spdxjson \
+            --predicate image-sbom.spdx.json \
+            "$IMAGE_REPO@${{ steps.image.outputs.digest }}"
+
       - name: Push Helm chart to ACR (OCI)
-        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.should.outputs.go == 'true'
         run: |
           helm push ${{ steps.pkg.outputs.pkg }} oci://$ACR/charts
 
       - name: Cosign sign chart (keyless)
-        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.should.outputs.go == 'true'
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
           REF=$ACR/charts/demo-upf:${{ steps.pkg.outputs.version }}
           cosign sign --yes "$REF"
 
-      - name: Cosign attest SBOM
-        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Cosign attest chart SBOM
+        if: steps.should.outputs.go == 'true'
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
@@ -140,7 +187,7 @@ jobs:
           cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
 
       - name: SLSA L3 build provenance attestation
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.should.outputs.go == 'true'
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: dist/*.tgz

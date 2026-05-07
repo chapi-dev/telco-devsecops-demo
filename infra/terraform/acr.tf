@@ -6,14 +6,5 @@ resource "azurerm_container_registry" "demo" {
   admin_enabled                 = false
   public_network_access_enabled = true
 
-  trust_policy {
-    enabled = true
-  }
-
-  retention_policy {
-    enabled = true
-    days    = 30
-  }
-
   tags = var.tags
 }

@@ -4,7 +4,7 @@
 replicaCount: 2
 
 image:
-  repository: acrtelcodemo.azurecr.io/charts/demo-upf
+  repository: acrtelcodemo.azurecr.io/nf/demo-nf
   pullPolicy: IfNotPresent
   # Tag defaults to .Chart.AppVersion. Set explicitly to a digest in production
   # to enable Sigstore verification by digest.

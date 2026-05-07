@@ -25,13 +25,13 @@ variable "aks_name" {
 variable "aks_node_count" {
   description = "Initial node count in the system pool."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "aks_vm_size" {
   description = "VM size for the system pool."
   type        = string
-  default     = "Standard_D4s_v5"
+  default     = "Standard_D2s_v5"
 }
 
 variable "managed_identity_name" {
