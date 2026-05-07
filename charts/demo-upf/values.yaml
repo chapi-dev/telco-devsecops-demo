@@ -1,0 +1,104 @@
+# Default values for demo-upf.
+# Production overrides live in gitops/envs/<env>/values.yaml.
+
+replicaCount: 2
+
+image:
+  repository: acrtelcodemo.azurecr.io/charts/demo-upf
+  pullPolicy: IfNotPresent
+  # Tag defaults to .Chart.AppVersion. Set explicitly to a digest in production
+  # to enable Sigstore verification by digest.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9100"
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  ports:
+    n3:
+      port: 2152
+      protocol: UDP
+      name: gtpu-n3
+    n4:
+      port: 8805
+      protocol: UDP
+      name: pfcp-n4
+    metrics:
+      port: 9100
+      protocol: TCP
+      name: metrics
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Multus secondary networks. SR-IOV / DPDK are referenced declaratively here;
+# the actual NetworkAttachmentDefinitions are templated in
+# templates/networkattachmentdefinition.yaml.
+multus:
+  enabled: true
+  networks:
+    - name: n3-sriov
+      type: sriov
+      vlan: 200
+      ipam:
+        type: whereabouts
+        range: 10.200.0.0/24
+    - name: n6-sriov
+      type: sriov
+      vlan: 600
+      ipam:
+        type: whereabouts
+        range: 10.60.0.0/24
+
+upf:
+  pfcp:
+    nodeId: "demo-upf-1"
+    associationSetupRetry: 3
+  dnn:
+    - name: internet
+      pool: 10.45.0.0/16
+    - name: ims
+      pool: 10.46.0.0/16
+  qosProfiles:
+    - id: 9
+      label: default-non-gbr
+    - id: 1
+      label: voice-gbr
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Subchart toggles
+cert-manager:
+  enabled: false
+prometheus-operator-crds:
+  enabled: false

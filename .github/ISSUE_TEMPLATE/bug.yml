@@ -1,0 +1,22 @@
+name: Bug report
+description: File a bug report
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      placeholder: |
+        Steps to reproduce, expected vs actual, env, logs.
+    validations:
+      required: true
+  - type: input
+    id: chart-version
+    attributes:
+      label: Chart / image version
+      placeholder: "demo-upf 1.0.0"
+  - type: input
+    id: cluster
+    attributes:
+      label: AKS / cluster
+      placeholder: "aks-telco-demo (westeurope)"

@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: demo-upf
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - cluster: in-cluster
+            url: https://kubernetes.default.svc
+            env: dev
+            valuesPath: gitops/envs/dev/values.yaml
+          - cluster: in-cluster
+            url: https://kubernetes.default.svc
+            env: prod-edge-london
+            valuesPath: gitops/envs/prod-edge-london/values.yaml
+  template:
+    metadata:
+      name: 'demo-upf-{{env}}'
+      labels:
+        app.kubernetes.io/part-of: 5g-core
+        env: '{{env}}'
+    spec:
+      project: default
+      source:
+        repoURL: https://github.com/chapi-dev/telco-devsecops-demo.git
+        targetRevision: main
+        path: charts/demo-upf
+        helm:
+          releaseName: 'demo-upf-{{env}}'
+          valueFiles:
+            - '../../{{valuesPath}}'
+      destination:
+        server: '{{url}}'
+        namespace: 'demo-upf-{{env}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+          - ServerSideApply=true
+        retry:
+          limit: 5
+          backoff:
+            duration: 30s
+            factor: 2
+            maxDuration: 5m

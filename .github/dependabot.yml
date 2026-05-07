@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: "helm"
+    directory: "/charts/demo-upf"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      cnf-subcharts:
+        patterns: ["*"]
+    labels: ["dependencies", "helm"]
+    commit-message:
+      prefix: "helm"
+      include: "scope"
+
+  - package-ecosystem: "docker"
+    directory: "/src/demo-nf"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "docker"]
+    commit-message:
+      prefix: "docker"
+
+  - package-ecosystem: "gomod"
+    directory: "/src/demo-nf"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "go"]
+    commit-message:
+      prefix: "go"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "actions"]
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: "terraform"
+    directory: "/infra/terraform"
+    schedule:
+      interval: "weekly"
+    labels: ["dependencies", "terraform"]
+    commit-message:
+      prefix: "terraform"

@@ -1,0 +1,22 @@
+{{- if .Values.multus.enabled -}}
+{{- range .Values.multus.networks }}
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: {{ .name }}
+  labels:
+    {{- include "demo-upf.labels" $ | nindent 4 }}
+spec:
+  config: |
+    {
+      "cniVersion": "0.3.1",
+      "type": {{ .type | quote }},
+      "vlan": {{ .vlan }},
+      "ipam": {
+        "type": {{ .ipam.type | quote }},
+        "range": {{ .ipam.range | quote }}
+      }
+    }
+{{- end }}
+{{- end }}

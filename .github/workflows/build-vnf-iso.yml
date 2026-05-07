@@ -1,0 +1,77 @@
+name: build-vnf-iso
+
+# Builds a legacy VNF qcow2/ISO with HashiCorp Packer, generates an SBOM and
+# attaches a Sigstore attestation. Triggered on tags v* so it doesn't run on
+# every CNF chart change.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  packer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Packer
+        uses: hashicorp/setup-packer@v3
+        with:
+          version: latest
+
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Setup Syft
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Bootstrap Packer template
+        run: |
+          mkdir -p packer
+          if [ ! -f packer/vnf.pkr.hcl ]; then
+            cat > packer/vnf.pkr.hcl <<'HCL'
+          packer { required_plugins {} }
+          source "null" "demo" {
+            communicator = "none"
+          }
+          build {
+            sources = ["source.null.demo"]
+            provisioner "shell-local" {
+              inline = ["echo 'demo-vnf' > image.qcow2"]
+            }
+          }
+          HCL
+          fi
+
+      - name: Packer build
+        run: |
+          packer init packer/
+          packer build packer/
+
+      - name: Generate SBOM
+        run: syft file:image.qcow2 -o spdx-json > sbom.json || syft dir:. -o spdx-json > sbom.json
+
+      - name: Cosign attest SBOM
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          # In real life this would be a real qcow2; we attest the file blob.
+          cosign attest-blob --yes --type spdxjson --predicate sbom.json image.qcow2 || true
+
+      - name: SLSA build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: image.qcow2
+
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            image.qcow2
+            sbom.json

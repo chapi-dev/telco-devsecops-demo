@@ -1,0 +1,13 @@
+# dev environment overrides — small footprint
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+multus:
+  enabled: false  # KinD/AKS without SR-IOV add-on

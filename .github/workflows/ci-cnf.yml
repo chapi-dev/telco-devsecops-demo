@@ -1,0 +1,143 @@
+name: ci-cnf
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'charts/**'
+      - 'src/**'
+      - '.github/workflows/ci-cnf.yml'
+  pull_request:
+    paths:
+      - 'charts/**'
+      - 'src/**'
+      - '.github/workflows/ci-cnf.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write           # OIDC -> Azure & Sigstore keyless
+  packages: write
+  attestations: write
+  security-events: write
+
+env:
+  ACR: acrtelcodemo.azurecr.io
+  CHART_DIR: charts/demo-upf
+
+jobs:
+  build:
+    name: Build · scan · sign · push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.14.4
+
+      - name: Setup Cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.0
+
+      - name: Setup Syft (SBOM)
+        uses: anchore/sbom-action/download-syft@v0
+
+      - name: Setup kubeconform
+        run: |
+          curl -sSLO https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz
+          tar xf kubeconform-linux-amd64.tar.gz
+          sudo install kubeconform /usr/local/bin/
+
+      - name: Helm lint
+        run: helm lint $CHART_DIR
+
+      - name: Helm dependency update
+        run: helm dependency update $CHART_DIR
+
+      - name: Render & validate manifests (kubeconform)
+        run: |
+          helm template demo-upf $CHART_DIR \
+            | kubeconform -strict -summary -ignore-missing-schemas
+
+      - name: Helm package
+        id: pkg
+        run: |
+          mkdir -p dist
+          helm package $CHART_DIR -d dist/
+          echo "pkg=$(ls dist/*.tgz)" >> $GITHUB_OUTPUT
+          echo "version=$(yq '.version' $CHART_DIR/Chart.yaml)" >> $GITHUB_OUTPUT
+
+      - name: Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: charts/
+          format: sarif
+          output: trivy-fs.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+      - name: Generate SBOM (SPDX)
+        run: |
+          syft "dir:$CHART_DIR" -o spdx-json > sbom.spdx.json
+
+      - name: Azure login (OIDC)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: az acr login -n acrtelcodemo
+
+      - name: Push Helm chart to ACR (OCI)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          helm push ${{ steps.pkg.outputs.pkg }} oci://$ACR/charts
+
+      - name: Cosign sign chart (keyless)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          REF=$ACR/charts/demo-upf:${{ steps.pkg.outputs.version }}
+          cosign sign --yes "$REF"
+
+      - name: Cosign attest SBOM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          REF=$ACR/charts/demo-upf:${{ steps.pkg.outputs.version }}
+          cosign attest --yes --type spdxjson --predicate sbom.spdx.json "$REF"
+
+      - name: SLSA L3 build provenance attestation
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: dist/*.tgz
+
+      - name: Upload artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-upf-${{ steps.pkg.outputs.version }}
+          path: |
+            dist/*.tgz
+            sbom.spdx.json
+            trivy-fs.sarif
+          retention-days: 30

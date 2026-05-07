@@ -1,0 +1,39 @@
+apiVersion: kyverno.io/v2beta1
+kind: ClusterPolicy
+metadata:
+  name: verify-cosign-signature
+  annotations:
+    policies.kyverno.io/title: Verify Sigstore signature on demo-upf images
+    policies.kyverno.io/category: Supply Chain Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/description: |
+      Every Pod whose image comes from acrtelcodemo.azurecr.io must carry a
+      valid Sigstore keyless signature whose subject matches the CI workflow
+      that built it. Demonstrates the "verify at deploy time" gate in the
+      reference architecture.
+spec:
+  validationFailureAction: Enforce
+  webhookTimeoutSeconds: 30
+  background: false
+  failurePolicy: Fail
+  rules:
+    - name: verify-cosign-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "acrtelcodemo.azurecr.io/*"
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    issuer: "https://token.actions.githubusercontent.com"
+                    subject: "https://github.com/chapi-dev/telco-devsecops-demo/.github/workflows/ci-cnf.yml@refs/heads/main"
+                    rekor:
+                      url: "https://rekor.sigstore.dev"
+          mutateDigest: true
+          verifyDigest: true
+          required: true

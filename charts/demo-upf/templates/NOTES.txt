@@ -1,0 +1,13 @@
+demo-upf {{ .Chart.AppVersion }} deployed in namespace {{ .Release.Namespace }}.
+
+Verify pods:
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+Inspect Multus secondary networks:
+  kubectl get net-attach-def -n {{ .Release.Namespace }}
+
+Verify Sigstore signature on the chart image (after CI):
+  cosign verify \
+    --certificate-identity-regexp 'https://github.com/chapi-dev/telco-devsecops-demo/.*' \
+    --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+    {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}

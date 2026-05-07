@@ -1,0 +1,37 @@
+apiVersion: v2
+name: demo-upf
+description: |
+  Demo 5G User Plane Function (UPF) Helm chart.
+  Reference for the "GitHub for VNF and CNF Lifecycle Management" demo.
+  Pinned subcharts (cert-manager, prometheus-operator-crds, multus-cni,
+  sriov-network-operator) showcase Dependabot Helm + closed-loop hygiene.
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - 5g
+  - upf
+  - cnf
+  - telco
+  - cloud-native-network-function
+maintainers:
+  - name: chapi-dev
+    url: https://github.com/chapi-dev
+home: https://github.com/chapi-dev/telco-devsecops-demo
+sources:
+  - https://github.com/chapi-dev/telco-devsecops-demo
+annotations:
+  artifacthub.io/category: networking
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/changes: |
+    - kind: added
+      description: Initial demo release of demo-upf
+dependencies:
+  - name: cert-manager
+    version: "1.14.5"
+    repository: "https://charts.jetstack.io"
+    condition: cert-manager.enabled
+  - name: prometheus-operator-crds
+    version: "13.0.0"
+    repository: "https://prometheus-community.github.io/helm-charts"
+    condition: prometheus-operator-crds.enabled

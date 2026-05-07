@@ -1,0 +1,14 @@
+# Default reviewers for every PR.
+* @chapi-dev
+
+# Platform team owns infra & policy.
+/infra/             @chapi-dev
+/policy/            @chapi-dev
+/.github/workflows/ @chapi-dev
+
+# NF team owns charts & operator.
+/charts/   @chapi-dev
+/src/      @chapi-dev
+
+# GitOps SRE owns runtime config.
+/gitops/   @chapi-dev

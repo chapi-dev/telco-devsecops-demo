@@ -1,0 +1,38 @@
+# Build artefacts
+dist/
+bin/
+*.tgz
+*.qcow2
+*.iso
+
+# SBOMs and scan reports (kept as workflow artefacts, not in source tree)
+sbom.spdx.json
+sbom.cyclonedx.json
+trivy*.sarif
+checkov*.sarif
+
+# Helm dependency cache (downloaded subcharts)
+charts/*/charts/
+# Note: Chart.lock IS committed — it pins versions + digests for audit
+# (see page 8 of the reference deck). Do NOT add Chart.lock here.
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!terraform.tfvars.example
+crash.log
+
+# Go
+*.test
+*.out
+vendor/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo

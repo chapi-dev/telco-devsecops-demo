@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "demo-upf.fullname" . }}-config
+  labels:
+    {{- include "demo-upf.labels" . | nindent 4 }}
+data:
+  upf.yaml: |
+    pfcp:
+      nodeId: {{ .Values.upf.pfcp.nodeId | quote }}
+      associationSetupRetry: {{ .Values.upf.pfcp.associationSetupRetry }}
+    dnn:
+      {{- toYaml .Values.upf.dnn | nindent 6 }}
+    qosProfiles:
+      {{- toYaml .Values.upf.qosProfiles | nindent 6 }}
