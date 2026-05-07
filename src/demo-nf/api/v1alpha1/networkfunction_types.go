@@ -65,3 +65,61 @@ type NetworkFunctionList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []NetworkFunction `json:"items"`
 }
+
+// DeepCopyInto copies the receiver into out. (controller-gen would generate this.)
+func (in *NetworkFunction) DeepCopyInto(out *NetworkFunction) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ObjectMeta.DeepCopyInto(&out.ObjectMeta)
+	out.Spec = in.Spec
+	out.Status = in.Status
+}
+
+// DeepCopy returns a deep copy of NetworkFunction.
+func (in *NetworkFunction) DeepCopy() *NetworkFunction {
+	if in == nil {
+		return nil
+	}
+	out := new(NetworkFunction)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject implements runtime.Object.
+func (in *NetworkFunction) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}
+
+// DeepCopyInto copies the receiver into out.
+func (in *NetworkFunctionList) DeepCopyInto(out *NetworkFunctionList) {
+	*out = *in
+	out.TypeMeta = in.TypeMeta
+	in.ListMeta.DeepCopyInto(&out.ListMeta)
+	if in.Items != nil {
+		out.Items = make([]NetworkFunction, len(in.Items))
+		for i := range in.Items {
+			in.Items[i].DeepCopyInto(&out.Items[i])
+		}
+	}
+}
+
+// DeepCopy returns a deep copy of NetworkFunctionList.
+func (in *NetworkFunctionList) DeepCopy() *NetworkFunctionList {
+	if in == nil {
+		return nil
+	}
+	out := new(NetworkFunctionList)
+	in.DeepCopyInto(out)
+	return out
+}
+
+// DeepCopyObject implements runtime.Object.
+func (in *NetworkFunctionList) DeepCopyObject() runtime.Object {
+	if c := in.DeepCopy(); c != nil {
+		return c
+	}
+	return nil
+}

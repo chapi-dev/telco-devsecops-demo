@@ -93,8 +93,21 @@ jobs:
         run: |
           syft "dir:$CHART_DIR" -o spdx-json > sbom.spdx.json
 
+      - name: Detect Azure credentials
+        id: gate
+        run: |
+          if [ -n "${{ secrets.AZURE_CLIENT_ID }}" ] && \
+             [ -n "${{ secrets.AZURE_TENANT_ID }}" ] && \
+             [ -n "${{ secrets.AZURE_SUBSCRIPTION_ID }}" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning ::Azure secrets not configured; skipping ACR push & cosign sign. \
+            Set AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_SUBSCRIPTION_ID after running infra/terraform."
+          fi
+
       - name: Azure login (OIDC)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -102,16 +115,16 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: ACR login
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: az acr login -n acrtelcodemo
 
       - name: Push Helm chart to ACR (OCI)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           helm push ${{ steps.pkg.outputs.pkg }} oci://$ACR/charts
 
       - name: Cosign sign chart (keyless)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
@@ -119,7 +132,7 @@ jobs:
           cosign sign --yes "$REF"
 
       - name: Cosign attest SBOM
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: steps.gate.outputs.ready == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
